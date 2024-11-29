@@ -3,152 +3,96 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZainZya Web</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css">
+  <title>Arduino IDE</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #1e1e1e;
-      color: #fff;
       margin: 0;
       padding: 0;
     }
-
     header {
-      background: #333;
-      padding: 10px 20px;
+      padding: 15px;
+      background-color: #007bff;
+      color: #fff;
       text-align: center;
+      font-size: 20px;
     }
-
-    header h1 {
-      margin: 0;
-      color: #61dafb;
-    }
-
-    main {
-      padding: 20px;
-    }
-
-    select, button, textarea {
-      margin: 10px 0;
-      padding: 10px;
-      font-size: 14px;
-      background: #2b2b2b;
-      color: #fff;
-      border: 1px solid #444;
-      border-radius: 5px;
-    }
-
-    textarea {
-      width: 100%;
-      height: 200px;
-      resize: none;
-    }
-
     #editor {
-      margin: 20px 0;
-      height: 400px;
-      background: #121212;
-      border: 1px solid #444;
-      color: #fff;
+      height: 300px;
+      border: 1px solid #ccc;
+      margin: 20px;
     }
-
     #controls {
+      margin: 20px;
       display: flex;
-      flex-wrap: wrap;
       gap: 10px;
-      justify-content: flex-start;
     }
-
-    #terminal-output {
-      background: #000;
-      color: #0f0;
+    #serial-output {
+      height: 200px;
+      margin: 20px;
       padding: 10px;
-      border: 1px solid #444;
-      height: 150px;
-      overflow-y: auto;
+      border: 1px solid #ccc;
+      overflow-y: scroll;
+      white-space: pre-wrap;
+      background: #f9f9f9;
+    }
+    select, button {
+      padding: 10px;
+      font-size: 16px;
+    }
+    button {
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>ZainZya Web</h1>
-  </header>
-  <main>
-    <section id="controls">
-      <select id="port-select">
-        <option value="">Select Port</option>
-      </select>
-      <select id="board-select">
-        <option value="">Select Board</option>
-        <option value="arduino:avr:uno">Arduino Uno</option>
-        <option value="arduino:avr:nano">Arduino Nano</option>
-        <option value="arduino:avr:mega">Arduino Mega</option>
-      </select>
-      <button id="compile-btn">Compile</button>
-      <button id="upload-btn">Upload</button>
-    </section>
+  <header>Arduino Web IDE</header>
 
-    <section id="editor">
-      <!-- CodeMirror editor will be embedded here -->
-    </section>
+  <div id="controls">
+    <select id="port-select">
+      <option value="">Select Port</option>
+    </select>
+    <input type="number" id="baud-rate" placeholder="Baud Rate" value="9600">
+    <button id="list-ports">List Ports</button>
+    <button id="start-serial">Start Serial Monitor</button>
+    <button id="stop-serial" disabled>Stop Serial Monitor</button>
+  </div>
 
-    <section>
-      <label for="baudRate">Baud Rate:</label>
-      <select id="baudRate">
-        <option value="9600">9600</option>
-        <option value="115200">115200</option>
-        <option value="57600">57600</option>
-        <option value="19200">19200</option>
-      </select>
-      <button id="connectSerial">Connect Serial Monitor</button>
-      <button id="disconnectSerial">Disconnect Serial Monitor</button>
-    </section>
+  <textarea id="editor">void setup() {\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  Serial.println("Hello, world!");\n  delay(1000);\n}</textarea>
 
-    <section>
-      <textarea id="serialOutput" readonly></textarea>
-    </section>
+  <div id="controls">
+    <button id="compile-btn">Compile</button>
+    <button id="upload-btn">Upload</button>
+  </div>
 
-    <section id="terminal">
-      <pre id="terminal-output"></pre>
-    </section>
-  </main>
+  <div id="serial-output"></div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/clike/clike.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io.connect();
-
-    const portSelect = document.getElementById("port-select");
-    const boardSelect = document.getElementById("board-select");
-    const compileBtn = document.getElementById("compile-btn");
-    const uploadBtn = document.getElementById("upload-btn");
-    const baudRateSelect = document.getElementById("baudRate");
-    const connectButton = document.getElementById("connectSerial");
-    const disconnectButton = document.getElementById("disconnectSerial");
-    const serialOutput = document.getElementById("serialOutput");
-    const terminalOutput = document.getElementById("terminal-output");
-
-    let isConnected = false;
-    let editor;
-
-    // Initialize CodeMirror
-    document.addEventListener("DOMContentLoaded", () => {
-      editor = CodeMirror(document.getElementById("editor"), {
-        lineNumbers: true,
-        mode: "javascript", // Adjust based on Arduino syntax
-        theme: "monokai",
-      });
-      fetchPorts();
+    const socket = io();
+    const editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
+      lineNumbers: true,
+      mode: "text/x-csrc",
     });
 
-    // Fetch available ports
-    function fetchPorts() {
-      socket.emit("listPorts");
-    }
+    const portSelect = document.getElementById("port-select");
+    const baudRateInput = document.getElementById("baud-rate");
+    const serialOutput = document.getElementById("serial-output");
 
-    // Populate ports in the dropdown
+    document.getElementById("list-ports").addEventListener("click", () => {
+      socket.emit("listPorts");
+    });
+
     socket.on("ports", (ports) => {
       portSelect.innerHTML = '<option value="">Select Port</option>';
       ports.forEach((port) => {
@@ -159,61 +103,44 @@
       });
     });
 
-    // Compile code
-    compileBtn.addEventListener("click", () => {
+    document.getElementById("compile-btn").addEventListener("click", () => {
       const code = editor.getValue();
       socket.emit("compile", code);
     });
 
-    // Upload code
-    uploadBtn.addEventListener("click", () => {
+    document.getElementById("upload-btn").addEventListener("click", () => {
       const code = editor.getValue();
       const port = portSelect.value;
-      const board = boardSelect.value;
-
-      if (!port || !board) {
-        alert("Please select both a port and a board.");
-        return;
-      }
-
-      socket.emit("upload", { code, port, board });
-    });
-
-    // Serial Monitor
-    connectButton.addEventListener("click", () => {
-      if (isConnected) return alert("Serial Monitor is already connected.");
-      const port = portSelect.value;
-      const baudRate = baudRateSelect.value;
-
       if (!port) {
-        alert("Please select a port before connecting the serial monitor.");
+        alert("Please select a port first.");
         return;
       }
-
-      socket.emit("startSerial", { port, baudRate });
-      isConnected = true;
-      serialOutput.value += `Connecting to ${port} at ${baudRate} baud...\n`;
+      socket.emit("upload", { code, port, board: "arduino:avr:uno" });
     });
 
-    disconnectButton.addEventListener("click", () => {
-      if (!isConnected) return alert("Serial Monitor is not connected.");
+    document.getElementById("start-serial").addEventListener("click", () => {
+      const port = portSelect.value;
+      const baudRate = baudRateInput.value || "9600";
+      if (!port) {
+        alert("Please select a port first.");
+        return;
+      }
+      socket.emit("startSerial", { port, baudRate });
+      document.getElementById("stop-serial").disabled = false;
+    });
+
+    document.getElementById("stop-serial").addEventListener("click", () => {
       socket.emit("stopSerial");
-      isConnected = false;
-      serialOutput.value += "Serial Monitor disconnected.\n";
+      document.getElementById("stop-serial").disabled = true;
     });
 
     socket.on("serialData", (data) => {
-      serialOutput.value += data + "\n";
-      serialOutput.scrollTop = serialOutput.scrollHeight; // Auto-scroll
+      serialOutput.textContent += `${data}\n`;
+      serialOutput.scrollTop = serialOutput.scrollHeight;
     });
 
     socket.on("output", (message) => {
-      terminalOutput.textContent += `${message}\n`;
-      terminalOutput.scrollTop = terminalOutput.scrollHeight;
-    });
-
-    socket.on("error", (err) => {
-      console.error("Socket error:", err);
+      serialOutput.textContent += `${message}\n`;
     });
   </script>
 </body>
